@@ -169,6 +169,24 @@ class BlobTest extends FunctionalTestCase
         $this->assertBlobContains('test');
     }
 
+    public function testBlobBindingDoesNotOverwritePrevious(): void
+    {
+        $params = ['test1', 'test2'];
+        $this->connection->executeStatement(
+            "INSERT INTO blob_table(id, clobcolumn, blobcolumn) VALUES (1, 'ignored', ?), (2, 'ignored', ?)",
+            $params,
+            [ParameterType::LARGE_OBJECT, ParameterType::LARGE_OBJECT],
+        );
+        $rows   = $this->connection->fetchFirstColumn('SELECT blobcolumn FROM blob_table ORDER BY id ASC');
+        $result = [];
+        foreach ($rows as $blobValue) {
+            $blobValue = Type::getType('blob')->convertToPHPValue($blobValue, $this->connection->getDatabasePlatform());
+            $result[]  = stream_get_contents($blobValue);
+        }
+
+        self::assertEquals(['test1', 'test2'], $result);
+    }
+
     private function assertBlobContains(string $text): void
     {
         [, $blobValue] = $this->fetchRow();
