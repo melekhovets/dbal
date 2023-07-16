@@ -171,21 +171,27 @@ class BlobTest extends FunctionalTestCase
 
     public function testBlobBindingDoesNotOverwritePrevious(): void
     {
-        $this->connection->insert('blob_table', [
-            'id' => 1, 'clobcolumn' => 'dummy', 'blobcolumn' => 'dummy'],
-            [ParameterType::INTEGER, ParameterType::STRING, ParameterType::LARGE_OBJECT]
-        );
+        $table = new Table('blob_table');
+        $table->addColumn('id', 'integer');
+        $table->addColumn('blobcolumn1', 'blob', ['notnull' => false]);
+        $table->addColumn('blobcolumn2', 'blob', ['notnull' => false]);
+        $table->setPrimaryKey(['id']);
+        $this->dropAndCreateTable($table);
 
         $params = ['test1', 'test2'];
-        $blobs = $this->connection->fetchNumeric(
-            'SELECT ? AS a, ? AS b FROM blob_table',
+        $this->connection->executeStatement(
+            'INSERT INTO blob_table(id, blobcolumn1, blobcolumn2) VALUES (1, ?, ?)',
             $params,
             [ParameterType::LARGE_OBJECT, ParameterType::LARGE_OBJECT],
         );
-        $actual  = [];
+
+        $blobs = $this->connection->fetchNumeric('SELECT blobcolumn1, blobcolumn2 FROM blob_table');
+        self::assertIsArray($blobs);
+
+        $actual = [];
         foreach ($blobs as $blob) {
-            $blob = Type::getType('blob')->convertToPHPValue($blob, $this->connection->getDatabasePlatform());
-            $actual[]  = stream_get_contents($blob);
+            $blob     = Type::getType('blob')->convertToPHPValue($blob, $this->connection->getDatabasePlatform());
+            $actual[] = stream_get_contents($blob);
         }
 
         self::assertEquals(['test1', 'test2'], $actual);
